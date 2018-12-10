@@ -1,0 +1,109 @@
+#!/bin/sh
+#
+# chkconfig: - 64 36
+# Default-Start: 2 3 4 5
+# Default-Stop: 0 1 2 3 4 6
+# Required-Start:
+# description: FTP server with just enough functionality to fool dummyftp
+# processname: python
+# pidfile: none
+# lockfile: /var/lock/subsys/example
+
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# Source networking configuration.
+. /etc/sysconfig/network
+
+# Check that networking is up.
+[ "$NETWORKING" = "no" ] && exit 0
+
+USER="root"
+APPNAME="dummyftp"
+APPBIN="/usr/bin/python"
+APPARGS="/srv/dummyftp/main.py"
+
+LOGFILE="/var/log/$APPNAME.log"
+LOCKFILE="/var/lock/subsys/$APPNAME"
+PIDFILE="/var/run/$APPNAME.pid"
+
+LOGPATH=$(dirname $LOGFILE)
+RUNCMD="$APPBIN $APPARGS"
+
+start() {
+    [ -x $APPBIN ] || exit 5
+    [ -d $LOGPATH ] || mkdir $LOGPATH
+    [ -f $LOGFILE ] || touch $LOGFILE
+
+    local pids=$(pgrep -f "$RUNCMD")
+
+    if [ -n "$pids" ]; then
+        echo "$APPNAME (pid $pids) is already running"
+        echo
+        return 0
+    fi
+
+    echo -n $"Starting $APPNAME: "
+    daemon --user=$USER --pidfile "$PIDFILE" "$RUNCMD &>>$LOGFILE &"
+    echo
+
+    RETVAL=$?
+    return $RETVAL
+}
+
+stop() {
+    local pids=$(pgrep -f "$RUNCMD")
+    if [ ! -n "$pids" ]; then
+        echo "$APPNAME is already stopped"
+        echo
+        return 0
+    fi
+    echo -n $"Stopping $APPNAME: " ''
+    echo
+
+    pgrep -f "$RUNCMD" | xargs kill
+
+    RETVAL=$?
+    return $RETVAL
+}
+
+status() {
+    # see if running
+    local pids=$(pgrep -f "$RUNCMD")    
+
+    if [ -n "$pids" ]; then
+        echo "$APPNAME (pid $pids) is running"
+    else
+        echo "$APPNAME is stopped" ''
+    fi
+    echo
+}
+
+restart() {
+    local pids=$(pgrep -f "$RUNCMD")    
+    if [ -n "$pids" ]; then
+        stop
+        sleep 1
+    fi
+    start
+}
+
+case "$1" in
+  start)
+    start
+    ;;
+  stop)
+    stop
+    ;;
+  status)
+    status
+    ;;
+  restart)
+    restart
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|status|restart}"
+    exit 1
+esac
+
